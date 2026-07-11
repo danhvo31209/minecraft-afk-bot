@@ -1,149 +1,76 @@
 const mineflayer = require('mineflayer');
-const axios = require('axios');
 const express = require('express');
-const config = require('./config.json');
+const fs = require('fs');
 
-// ── Web server ─────────────────────────────────────────────────────────────
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
+
+// Đọc file cấu hình config.json
+const config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
 app.get('/', (req, res) => {
-  res.send('<h1>Bot đang chạy!</h1>');
+  res.send('Bot Minecraft AFK đang chạy trực tuyến!');
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🌍 Web server đang chạy tại cổng ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server đang lắng nghe tại port ${port}`);
 });
 
-const RECONNECT_DELAY    = 60000;       // 1 phút
-const ANTI_AFK_INTERVAL  = 30000;       // 30 giây
-const KEEPALIVE_INTERVAL = 5 * 60000;   // 5 phút
-const CLEANUP_CYCLE      = 5 * 60000;   // 5 phút
-const KEEPALIVE_URL = 'https://magmanode.com/server?id=1041872#';
-
-let bot;
-let antiAfkTimer  = null;
-let antiAfkPhase  = 0;
-let cleanupTimers = [];
-
-// ── Keep-alive: ping MagmaNode mỗi 5 phút ──────────────────────────────────
-async function pingKeepalive() {
-  try {
-    const res = await axios.get(KEEPALIVE_URL, {
-      timeout: 15000,
-      maxRedirects: 5,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive',
-      }
-    });
-    console.log(`🌐 Keep-alive ping OK (HTTP ${res.status})`);
-  } catch (err) {
-    const status = err.response ? err.response.status : null;
-    if (status === 403 || status === 401) {
-      console.log(`🌐 Keep-alive ping tới MagmaNode (HTTP ${status} — server đang hoạt động)`);
-    } else if (status) {
-      console.warn(`⚠️  Keep-alive ping: HTTP ${status}`);
-    } else {
-      console.warn(`⚠️  Keep-alive ping thất bại: ${err.message}`);
-    }
-  }
-}
-
-setInterval(pingKeepalive, KEEPALIVE_INTERVAL);
-pingKeepalive();
-
-// ── Dọn rác định kỳ 5 phút ────────────────────────────────────────────────
-function stopCleanupCycle() {
-  cleanupTimers.forEach(t => clearTimeout(t));
-  cleanupTimers = [];
-}
-
-function startCleanupCycle() {
-  stopCleanupCycle();
-
-  cleanupTimers.push(setTimeout(() => {
-    if (!bot || !bot.entity) return;
-    bot.chat('[Hệ thống] Vật phẩm dưới đất sẽ bị xóa sau 60 giây!');
-    console.log('🗑️  Dọn rác: cảnh báo 60 giây');
-  }, CLEANUP_CYCLE - 60000));
-
-  cleanupTimers.push(setTimeout(() => {
-    if (!bot || !bot.entity) return;
-    bot.chat('[Hệ thống] Vật phẩm dưới đất sẽ bị xóa sau 10 giây!');
-    console.log('🗑️  Dọn rác: cảnh báo 10 giây');
-  }, CLEANUP_CYCLE - 10000));
-
-  cleanupTimers.push(setTimeout(() => {
-    if (!bot || !bot.entity) return;
-    bot.chat('/kill @e[type=item]');
-    console.log('🗑️  Dọn rác: đã chạy /kill @e[type=item]');
-
-    setTimeout(() => {
-      if (!bot || !bot.entity) return;
-      bot.chat('[Hệ thống] Đã dọn dẹp sạch sẽ vật phẩm rơi vãi!');
-      console.log('✨ Dọn rác: hoàn tất, bắt đầu chu kỳ mới');
-      startCleanupCycle();
-    }, 1000);
-  }, CLEANUP_CYCLE));
-}
-
-// ── Anti-AFK ───────────────────────────────────────────────────────────────
-function startAntiAfk() {
-  if (antiAfkTimer) clearInterval(antiAfkTimer);
-
-  antiAfkTimer = setInterval(() => {
-    if (!bot || !bot.entity) return;
-
-    if (antiAfkPhase === 0) {
-      bot.setControlState('jump', true);
-      setTimeout(() => bot.entity && bot.setControlState('jump', false), 500);
-      console.log('🔄 Anti-AFK: nhảy');
-    } else {
-      const yaw = (bot.entity.yaw + Math.PI / 2) % (2 * Math.PI);
-      bot.look(yaw, 0, false);
-      console.log('🔄 Anti-AFK: xoay người');
-    }
-
-    antiAfkPhase = (antiAfkPhase + 1) % 2;
-  }, ANTI_AFK_INTERVAL);
-}
-
-// ── Bot ────────────────────────────────────────────────────────────────────
 function createBot() {
-  bot = mineflayer.createBot({
+  const bot = mineflayer.createBot({
     host: config.serverHost,
     port: config.serverPort,
     username: config.botUsername,
-    auth: 'offline',
-    version: false,
-    viewDistance: config.botChunk
+    version: false // Tự động nhận diện phiên bản server
   });
 
-  console.log(`🔌 Đang kết nối tới ${config.serverHost}:${config.serverPort}...`);
-
   bot.on('spawn', () => {
-    console.log(`✅ ${config.botUsername} is Ready!`);
-    startAntiAfk();
-    startCleanupCycle();
+    console.log(`${bot.username} đã vào server thành công!`);
+    bot.chat('/register MatKhau123 MatKhau123'); // Tự động đăng ký nếu cần
+    bot.chat('/login MatKhau123'); // Tự động đăng nhập nếu cần
+    
+    // Kích hoạt tính năng random di chuyển chống AFK kíck
+    startRandomAFK(bot);
+  });
+
+  bot.on('end', () => {
+    console.log('Bot bị mất kết nối, đang tiến hành kết nối lại sau 5 giây...');
+    setTimeout(createBot, 5000);
   });
 
   bot.on('error', (err) => {
-    console.error('⚠️  Lỗi kết nối:', err.message || err);
+    console.log('Lỗi Bot:', err);
   });
+}
 
-  bot.on('end', (reason) => {
-    console.log(`⛔️ Bot mất kết nối${reason ? ` (${reason})` : ''}. Thử lại sau ${RECONNECT_DELAY / 1000}s...`);
-    if (antiAfkTimer) { clearInterval(antiAfkTimer); antiAfkTimer = null; }
-    stopCleanupCycle();
-    setTimeout(createBot, RECONNECT_DELAY);
-  });
+// Hàm xử lý hành động ngẫu nhiên cho Bot
+function startRandomAFK(bot) {
+  setInterval(() => {
+    if (!bot.entity) return;
 
-  bot.on('kicked', (reason) => {
-    console.warn('🚫 Bot bị kick:', reason);
-  });
+    const actions = ['forward', 'back', 'left', 'right', 'jump', 'look'];
+    // Chọn ngẫu nhiên 1 hành động trong danh sách trên
+    const randomAction = actions[Math.floor(Math.random() * actions.length)];
+
+    console.log(`[AFK] Bot đang thực hiện hành động ngẫu nhiên: ${randomAction}`);
+
+    if (randomAction === 'look') {
+      // Xoay hướng nhìn ngẫu nhiên
+      const yaw = Math.random() * Math.PI * 2;
+      const pitch = (Math.random() - 0.5) * Math.PI * 0.5;
+      bot.look(yaw, pitch);
+    } else if (randomAction === 'jump') {
+      // Nhảy lên 1 cái
+      bot.setControlState('jump', true);
+      setTimeout(() => bot.setControlState('jump', false), 500);
+    } else {
+      // Di chuyển (tiến/lùi/trái/phải) trong vòng 1 giây rồi dừng lại
+      bot.setControlState(randomAction, true);
+      setTimeout(() => bot.setControlState(randomAction, false), 1000);
+    }
+
+  }, Math.floor(Math.random() * (20000 - 10000 + 1)) + 10000); 
+  // Thời gian lặp lại ngẫu nhiên trong khoảng từ 10 đến 20 giây một lần
 }
 
 createBot();
