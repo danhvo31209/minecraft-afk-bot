@@ -1,6 +1,6 @@
 {
-  "serverHost": "IP_SERVER_CỦA_BẠN",
-  "serverPort": 25565,
-  "botUsername": "TEN_BOT_CỦA_BẠN",
+  "serverHost": "dynamic-10.magmanode.com",
+  "serverPort": 25920,
+  "botUsername": "BotGay",
   "botChunk": 4
 }
