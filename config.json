@@ -1,0 +1,6 @@
+{
+  "serverHost": "IP_SERVER_CỦA_BẠN",
+  "serverPort": 25565,
+  "botUsername": "TEN_BOT_CỦA_BẠN",
+  "botChunk": 4
+}
